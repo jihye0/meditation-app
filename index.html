@@ -288,7 +288,22 @@ function makeNoiseBuffer(c) {
   return buf;
 }
 
+// 아이폰 무음 모드에서도 소리가 나도록, 무음 오디오 태그를 먼저 재생해
+// 오디오 세션을 미디어 재생 모드로 전환한다
+let silentEl = null;
+function unlockIOSAudio() {
+  if (!silentEl) {
+    silentEl = document.createElement('audio');
+    silentEl.setAttribute('playsinline', '');
+    silentEl.loop = true;
+    // 아주 짧은 무음 wav (base64)
+    silentEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACAgICA';
+  }
+  silentEl.play().catch(() => {});
+}
+
 function startSound(type) {
+  unlockIOSAudio();
   ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
   ctx.resume();
   masterGain = ctx.createGain();
@@ -352,6 +367,7 @@ function startSound(type) {
 }
 
 function stopSound() {
+  if (silentEl) silentEl.pause();
   if (bowlTimer) { clearTimeout(bowlTimer); bowlTimer = null; }
   if (masterGain && ctx) {
     masterGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
