@@ -6,111 +6,189 @@
 <title>고요 — 명상 타이머</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#1a1f2e">
+<meta name="theme-color" content="#10131f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang&family=Gowun+Dodum&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg1: #1a1f2e;
-    --bg2: #2d3a52;
-    --accent: #8fb8a8;
-    --text: #e8ecf1;
-    --muted: #9aa5b5;
+    --bg: #10131f;
+    --accent: #a8d8c8;
+    --accent2: #c4a8e8;
+    --gold: #e8d5a8;
+    --text: #eef1f6;
+    --muted: #8b94a8;
+    --glass: rgba(255,255,255,0.055);
+    --glass-border: rgba(255,255,255,0.1);
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
-    font-family: 'Pretendard', -apple-system, 'Malgun Gothic', sans-serif;
-    background: radial-gradient(ellipse at top, var(--bg2), var(--bg1));
+    font-family: 'Gowun Dodum', -apple-system, 'Malgun Gothic', sans-serif;
+    background: var(--bg);
     color: var(--text);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 24px;
+    padding: 56px 20px 60px;
+    overflow-x: hidden;
   }
-  h1 { font-weight: 300; letter-spacing: 12px; margin-bottom: 8px; font-size: 32px; }
-  .sub { color: var(--muted); margin-bottom: 40px; font-size: 14px; }
-  .section-label { color: var(--muted); font-size: 13px; margin: 24px 0 12px; letter-spacing: 2px; }
-  .chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  /* --- 오로라 배경 --- */
+  .aurora { position: fixed; inset: 0; z-index: -2; overflow: hidden; }
+  .aurora span {
+    position: absolute; border-radius: 50%;
+    filter: blur(90px); opacity: 0.35;
+  }
+  .aurora span:nth-child(1) {
+    width: 60vmax; height: 60vmax; left: -15vmax; top: -20vmax;
+    background: #2a4a5e; animation: drift1 26s ease-in-out infinite alternate;
+  }
+  .aurora span:nth-child(2) {
+    width: 50vmax; height: 50vmax; right: -18vmax; top: 15vh;
+    background: #3d2e5c; animation: drift2 32s ease-in-out infinite alternate;
+  }
+  .aurora span:nth-child(3) {
+    width: 45vmax; height: 45vmax; left: 10vw; bottom: -25vmax;
+    background: #1e4a40; animation: drift3 28s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { to { transform: translate(12vw, 10vh) scale(1.15); } }
+  @keyframes drift2 { to { transform: translate(-10vw, 14vh) scale(0.9); } }
+  @keyframes drift3 { to { transform: translate(8vw, -12vh) scale(1.2); } }
+  /* --- 별 --- */
+  .stars { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  .stars i {
+    position: absolute; width: 2px; height: 2px; border-radius: 50%;
+    background: #fff; opacity: 0.5;
+    animation: twinkle 4s ease-in-out infinite;
+  }
+  @keyframes twinkle { 0%,100% { opacity: 0.12; } 50% { opacity: 0.7; } }
+
+  h1 {
+    font-family: 'Gowun Batang', serif;
+    font-weight: 400; letter-spacing: 18px; text-indent: 18px;
+    font-size: 36px; margin-bottom: 10px;
+    background: linear-gradient(120deg, var(--accent), var(--accent2), var(--gold));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sub { color: var(--muted); margin-bottom: 44px; font-size: 13.5px; letter-spacing: 3px; }
+
+  .section-label {
+    color: var(--muted); font-size: 12px; margin: 30px 0 14px;
+    letter-spacing: 5px; text-indent: 5px;
+  }
+  .chips { display: flex; gap: 9px; flex-wrap: wrap; justify-content: center; max-width: 460px; }
   .chip {
-    padding: 10px 20px;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 24px;
-    background: rgba(255,255,255,0.04);
+    padding: 10px 19px;
+    border: 1px solid var(--glass-border);
+    border-radius: 26px;
+    background: var(--glass);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
     color: var(--text);
     cursor: pointer;
-    font-size: 15px;
-    transition: all 0.25s;
+    font-size: 14.5px;
+    font-family: inherit;
+    transition: all 0.3s cubic-bezier(.4,0,.2,1);
   }
-  .chip:hover { background: rgba(255,255,255,0.1); }
-  .chip.active { background: var(--accent); color: #1a1f2e; border-color: var(--accent); font-weight: 600; }
-  .timer-display {
-    font-size: 72px;
-    font-weight: 200;
-    margin: 40px 0 8px;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 4px;
+  .chip:hover { background: rgba(255,255,255,0.11); transform: translateY(-2px); }
+  .chip.active {
+    background: linear-gradient(135deg, var(--accent), #7fb8a4);
+    color: #10131f; border-color: transparent; font-weight: 700;
+    box-shadow: 0 4px 24px rgba(168,216,200,0.35);
   }
+
+  /* --- 진행 링 --- */
   .ring {
-    width: 280px; height: 280px;
+    width: 300px; height: 300px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    border-radius: 50%;
-    position: relative;
-    margin: 20px 0;
+    border-radius: 50%; position: relative; margin: 40px 0 8px;
+  }
+  .ring::before {
+    content: ''; position: absolute; inset: 18px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(168,216,200,0.07), transparent 70%);
   }
   .ring svg { position: absolute; top: 0; left: 0; transform: rotate(-90deg); }
-  .ring .timer-display { margin: 0; font-size: 56px; }
-  .ring .status { color: var(--muted); font-size: 14px; margin-top: 4px; }
-  .controls { display: flex; gap: 16px; margin-top: 32px; }
+  .timer-display {
+    font-size: 60px; font-weight: 300;
+    font-variant-numeric: tabular-nums; letter-spacing: 3px;
+    font-family: 'Gowun Batang', serif;
+    text-shadow: 0 0 40px rgba(168,216,200,0.3);
+  }
+  .status { color: var(--muted); font-size: 13.5px; margin-top: 8px; letter-spacing: 2px; }
+  body.playing .ring { animation: ringbreathe 8s ease-in-out infinite; }
+  @keyframes ringbreathe { 0%,100% { transform: scale(0.985); } 50% { transform: scale(1.015); } }
+
+  .controls { display: flex; gap: 14px; margin-top: 28px; }
   .btn {
-    padding: 14px 44px;
-    border-radius: 32px;
-    border: none;
-    font-size: 17px;
-    cursor: pointer;
-    background: var(--accent);
-    color: #1a1f2e;
-    font-weight: 600;
-    transition: transform 0.15s, opacity 0.2s;
+    padding: 15px 48px; border-radius: 34px; border: none;
+    font-size: 16.5px; cursor: pointer; font-family: inherit;
+    background: linear-gradient(135deg, var(--accent), #86bda9);
+    color: #10131f; font-weight: 700; letter-spacing: 2px;
+    box-shadow: 0 6px 28px rgba(168,216,200,0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
   }
-  .btn:hover { transform: scale(1.04); }
-  .btn.secondary { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.2); }
-  .breath {
-    position: fixed; inset: 0; pointer-events: none; opacity: 0;
-    background: radial-gradient(circle at center, rgba(143,184,168,0.12), transparent 60%);
-    transition: opacity 2s;
+  .btn:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 10px 36px rgba(168,216,200,0.45); }
+  .btn:active { transform: scale(0.97); }
+  .btn.secondary {
+    background: var(--glass); color: var(--muted);
+    border: 1px solid var(--glass-border); box-shadow: none;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
-  body.playing .breath { opacity: 1; animation: breathe 8s ease-in-out infinite; }
-  @keyframes breathe { 0%,100% { transform: scale(0.9); } 50% { transform: scale(1.15); } }
-  .volume-wrap { display: flex; align-items: center; gap: 12px; margin-top: 28px; color: var(--muted); font-size: 14px; }
-  input[type=range] { accent-color: var(--accent); width: 160px; }
-  .stats {
-    display: flex; gap: 12px; margin-top: 36px; width: 100%; max-width: 420px;
+
+  .volume-wrap {
+    display: flex; align-items: center; gap: 12px; margin-top: 30px;
+    color: var(--muted); font-size: 14px;
+    padding: 12px 22px; border-radius: 30px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
+  input[type=range] { accent-color: var(--accent); width: 150px; }
+
+  /* --- 기록 --- */
+  .stats { display: flex; gap: 12px; margin-top: 14px; width: 100%; max-width: 440px; }
   .stat-card {
-    flex: 1; text-align: center; padding: 16px 8px;
-    background: rgba(255,255,255,0.05); border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.08);
+    flex: 1; text-align: center; padding: 20px 8px 16px;
+    background: var(--glass); border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.25s;
   }
-  .stat-card .num { font-size: 26px; font-weight: 600; color: var(--accent); }
-  .stat-card .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
-  .history { width: 100%; max-width: 420px; margin-top: 16px; }
+  .stat-card:hover { transform: translateY(-3px); }
+  .stat-card .num {
+    font-size: 30px; font-weight: 400; font-family: 'Gowun Batang', serif;
+    background: linear-gradient(120deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-card .label { font-size: 11.5px; color: var(--muted); margin-top: 6px; letter-spacing: 1px; }
+  .history { width: 100%; max-width: 440px; margin-top: 14px; }
   .history-item {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 16px; border-radius: 12px; margin-bottom: 8px;
-    background: rgba(255,255,255,0.04); font-size: 14px;
+    padding: 14px 20px; border-radius: 16px; margin-bottom: 9px;
+    background: var(--glass); border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    font-size: 14px;
   }
   .history-item .when { color: var(--muted); font-size: 12px; }
-  .empty-history { text-align: center; color: var(--muted); font-size: 13px; padding: 16px; }
+  .empty-history { text-align: center; color: var(--muted); font-size: 13px; padding: 20px; }
+
+  .quote {
+    margin-top: 48px; color: var(--muted); font-size: 13px;
+    font-family: 'Gowun Batang', serif; font-style: normal;
+    text-align: center; max-width: 320px; line-height: 1.9; opacity: 0.8;
+  }
 </style>
 </head>
 <body>
-<div class="breath"></div>
-<h1>고 요</h1>
-<div class="sub">명상 타이머 &amp; 사운드</div>
+<div class="aurora"><span></span><span></span><span></span></div>
+<div class="stars" id="stars"></div>
 
-<div class="section-label">시 간</div>
+<h1>고요</h1>
+<div class="sub">잠시, 숨을 고르는 시간</div>
+
+<div class="section-label">시간</div>
 <div class="chips" id="timeChips">
   <button class="chip" data-min="5">5분</button>
   <button class="chip active" data-min="10">10분</button>
@@ -120,7 +198,7 @@
   <button class="chip" data-min="60">60분</button>
 </div>
 
-<div class="section-label">사 운 드</div>
+<div class="section-label">사운드</div>
 <div class="chips" id="soundChips">
   <button class="chip active" data-sound="rain">🌧️ 빗소리</button>
   <button class="chip" data-sound="ocean">🌊 파도</button>
@@ -130,10 +208,18 @@
 </div>
 
 <div class="ring">
-  <svg width="280" height="280">
-    <circle cx="140" cy="140" r="130" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
-    <circle id="progress" cx="140" cy="140" r="130" fill="none" stroke="#8fb8a8" stroke-width="6"
-      stroke-linecap="round" stroke-dasharray="816.8" stroke-dashoffset="816.8"/>
+  <svg width="300" height="300">
+    <defs>
+      <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#a8d8c8"/>
+        <stop offset="55%" stop-color="#c4a8e8"/>
+        <stop offset="100%" stop-color="#e8d5a8"/>
+      </linearGradient>
+    </defs>
+    <circle cx="150" cy="150" r="138" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="5"/>
+    <circle id="progress" cx="150" cy="150" r="138" fill="none" stroke="url(#ringGrad)" stroke-width="5"
+      stroke-linecap="round" stroke-dasharray="867.1" stroke-dashoffset="867.1"
+      style="transition: stroke-dashoffset 1s linear"/>
   </svg>
   <div class="timer-display" id="display">10:00</div>
   <div class="status" id="status">준비됨</div>
@@ -148,7 +234,7 @@
   🔈 <input type="range" id="volume" min="0" max="100" value="50"> 🔊
 </div>
 
-<div class="section-label" style="margin-top:40px">나 의 기 록</div>
+<div class="section-label" style="margin-top:48px">나의 기록</div>
 <div class="stats">
   <div class="stat-card"><div class="num" id="statTotal">0</div><div class="label">총 명상 (분)</div></div>
   <div class="stat-card"><div class="num" id="statCount">0</div><div class="label">완료 횟수</div></div>
@@ -156,12 +242,37 @@
 </div>
 <div class="history" id="historyList"></div>
 
+<div class="quote" id="quote"></div>
+
 <script>
 let ctx = null, masterGain = null, nodes = [], bowlTimer = null;
 let totalSec = 600, remainSec = 600, tickInterval = null, running = false;
-const CIRC = 816.8;
+const CIRC = 867.1;
 
 const $ = id => document.getElementById(id);
+
+// --- 별 흩뿌리기 ---
+(function () {
+  const wrap = $('stars');
+  for (let i = 0; i < 40; i++) {
+    const s = document.createElement('i');
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.top = Math.random() * 100 + 'vh';
+    s.style.animationDelay = Math.random() * 4 + 's';
+    s.style.animationDuration = 3 + Math.random() * 4 + 's';
+    wrap.appendChild(s);
+  }
+})();
+
+// --- 오늘의 한 줄 ---
+const quotes = [
+  '“숨을 들이쉬며 마음을 고요히 하고,\n숨을 내쉬며 미소 짓는다.” — 틱낫한',
+  '“현재 이 순간이 우리가 가진 전부다.”',
+  '“고요함 속에서 비로소 자신을 만난다.”',
+  '“천천히 가도 괜찮다. 멈추지만 않는다면.”',
+  '“마음이 잔잔해지면, 길이 보인다.”'
+];
+$('quote').textContent = quotes[new Date().getDate() % quotes.length];
 
 // --- 사운드 합성 ---
 function makeNoiseBuffer(c) {
@@ -303,6 +414,13 @@ function finish() {
   remainSec = totalSec;
   setTimeout(render, 100);
 }
+function reset() {
+  pause();
+  remainSec = totalSec;
+  $('startBtn').textContent = '시작';
+  $('status').textContent = '준비됨';
+  render();
+}
 
 // --- 명상 기록 ---
 function loadHistory() {
@@ -343,13 +461,6 @@ function renderHistory() {
       String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     return '<div class="history-item"><span>' + r.sound + ' · ' + r.min + '분</span><span class="when">' + when + '</span></div>';
   }).join('');
-}
-function reset() {
-  pause();
-  remainSec = totalSec;
-  $('startBtn').textContent = '시작';
-  $('status').textContent = '준비됨';
-  render();
 }
 
 $('startBtn').onclick = () => running ? pause() : start();
