@@ -275,15 +275,19 @@ const quotes = [
 $('quote').textContent = quotes[new Date().getDate() % quotes.length];
 
 // --- 사운드 합성 ---
-function makeNoiseBuffer(c) {
+function makeNoiseBuffer(c, kind) {
   const len = c.sampleRate * 4;
   const buf = c.createBuffer(1, len, c.sampleRate);
   const d = buf.getChannelData(0);
-  let last = 0;
-  for (let i = 0; i < len; i++) {
-    const white = Math.random() * 2 - 1;
-    last = 0.98 * last + 0.02 * white; // 갈색에 가까운 부드러운 노이즈
-    d[i] = last * 8;
+  if (kind === 'white') {
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  } else {
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      const white = Math.random() * 2 - 1;
+      last = 0.98 * last + 0.02 * white; // 갈색에 가까운 부드러운 노이즈
+      d[i] = last * 8;
+    }
   }
   return buf;
 }
@@ -311,20 +315,49 @@ function startSound(type) {
   masterGain.connect(ctx.destination);
   masterGain.gain.linearRampToValueAtTime($('volume').value / 100, ctx.currentTime + 3);
 
-  if (type === 'rain' || type === 'ocean' || type === 'wind') {
+  if (type === 'rain') {
+    // 층1: '쏴아' 하는 빗줄기 (백색소음 + 밴드패스)
     const src = ctx.createBufferSource();
-    src.buffer = makeNoiseBuffer(ctx);
+    src.buffer = makeNoiseBuffer(ctx, 'white');
+    src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 2500; bp.Q.value = 0.4;
+    const rainGain = ctx.createGain(); rainGain.gain.value = 0.5;
+    src.connect(bp); bp.connect(rainGain); rainGain.connect(masterGain);
+    src.start(); nodes.push(src);
+    // 층2: 낮게 깔리는 빗소리 바닥
+    const src2 = ctx.createBufferSource();
+    src2.buffer = makeNoiseBuffer(ctx, 'brown');
+    src2.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 600;
+    const baseGain = ctx.createGain(); baseGain.gain.value = 0.25;
+    src2.connect(lp); lp.connect(baseGain); baseGain.connect(masterGain);
+    src2.start(); nodes.push(src2);
+    // 층3: 가끔 똑, 똑 떨어지는 빗방울
+    const drop = () => {
+      if (!running) return;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      const f = 600 + Math.random() * 1800;
+      o.frequency.setValueAtTime(f, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(f * 0.5, ctx.currentTime + 0.06);
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.06 + Math.random() * 0.05, ctx.currentTime + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+      o.connect(g); g.connect(masterGain);
+      o.start(); o.stop(ctx.currentTime + 0.1);
+      bowlTimer = setTimeout(drop, 120 + Math.random() * 700);
+    };
+    drop();
+  } else if (type === 'ocean' || type === 'wind') {
+    const src = ctx.createBufferSource();
+    src.buffer = makeNoiseBuffer(ctx, 'brown');
     src.loop = true;
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
     src.connect(filter); filter.connect(masterGain);
-    if (type === 'rain') {
-      filter.frequency.value = 3000;
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass'; hp.frequency.value = 400;
-      filter.disconnect(); src.disconnect();
-      src.connect(hp); hp.connect(filter); filter.connect(masterGain);
-    } else if (type === 'ocean') {
+    if (type === 'ocean') {
       filter.frequency.value = 500;
       // 파도의 밀려오고 빠지는 느낌
       const lfo = ctx.createOscillator(), lfoGain = ctx.createGain();
