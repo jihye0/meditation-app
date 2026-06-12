@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고요 — 명상 타이머</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1a1f2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root {
+    --bg1: #1a1f2e;
+    --bg2: #2d3a52;
+    --accent: #8fb8a8;
+    --text: #e8ecf1;
+    --muted: #9aa5b5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Pretendard', -apple-system, 'Malgun Gothic', sans-serif;
+    background: radial-gradient(ellipse at top, var(--bg2), var(--bg1));
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  h1 { font-weight: 300; letter-spacing: 12px; margin-bottom: 8px; font-size: 32px; }
+  .sub { color: var(--muted); margin-bottom: 40px; font-size: 14px; }
+  .section-label { color: var(--muted); font-size: 13px; margin: 24px 0 12px; letter-spacing: 2px; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    padding: 10px 20px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 24px;
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.25s;
+  }
+  .chip:hover { background: rgba(255,255,255,0.1); }
+  .chip.active { background: var(--accent); color: #1a1f2e; border-color: var(--accent); font-weight: 600; }
+  .timer-display {
+    font-size: 72px;
+    font-weight: 200;
+    margin: 40px 0 8px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 4px;
+  }
+  .ring {
+    width: 280px; height: 280px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 50%;
+    position: relative;
+    margin: 20px 0;
+  }
+  .ring svg { position: absolute; top: 0; left: 0; transform: rotate(-90deg); }
+  .ring .timer-display { margin: 0; font-size: 56px; }
+  .ring .status { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .controls { display: flex; gap: 16px; margin-top: 32px; }
+  .btn {
+    padding: 14px 44px;
+    border-radius: 32px;
+    border: none;
+    font-size: 17px;
+    cursor: pointer;
+    background: var(--accent);
+    color: #1a1f2e;
+    font-weight: 600;
+    transition: transform 0.15s, opacity 0.2s;
+  }
+  .btn:hover { transform: scale(1.04); }
+  .btn.secondary { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.2); }
+  .breath {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at center, rgba(143,184,168,0.12), transparent 60%);
+    transition: opacity 2s;
+  }
+  body.playing .breath { opacity: 1; animation: breathe 8s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(0.9); } 50% { transform: scale(1.15); } }
+  .volume-wrap { display: flex; align-items: center; gap: 12px; margin-top: 28px; color: var(--muted); font-size: 14px; }
+  input[type=range] { accent-color: var(--accent); width: 160px; }
+  .stats {
+    display: flex; gap: 12px; margin-top: 36px; width: 100%; max-width: 420px;
+  }
+  .stat-card {
+    flex: 1; text-align: center; padding: 16px 8px;
+    background: rgba(255,255,255,0.05); border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .stat-card .num { font-size: 26px; font-weight: 600; color: var(--accent); }
+  .stat-card .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .history { width: 100%; max-width: 420px; margin-top: 16px; }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-radius: 12px; margin-bottom: 8px;
+    background: rgba(255,255,255,0.04); font-size: 14px;
+  }
+  .history-item .when { color: var(--muted); font-size: 12px; }
+  .empty-history { text-align: center; color: var(--muted); font-size: 13px; padding: 16px; }
+</style>
+</head>
+<body>
+<div class="breath"></div>
+<h1>고 요</h1>
+<div class="sub">명상 타이머 &amp; 사운드</div>
+
+<div class="section-label">시 간</div>
+<div class="chips" id="timeChips">
+  <button class="chip" data-min="5">5분</button>
+  <button class="chip active" data-min="10">10분</button>
+  <button class="chip" data-min="15">15분</button>
+  <button class="chip" data-min="20">20분</button>
+  <button class="chip" data-min="30">30분</button>
+  <button class="chip" data-min="60">60분</button>
+</div>
+
+<div class="section-label">사 운 드</div>
+<div class="chips" id="soundChips">
+  <button class="chip active" data-sound="rain">🌧️ 빗소리</button>
+  <button class="chip" data-sound="ocean">🌊 파도</button>
+  <button class="chip" data-sound="wind">🍃 바람</button>
+  <button class="chip" data-sound="bowl">🔔 싱잉볼</button>
+  <button class="chip" data-sound="drone">🕉️ 옴 드론</button>
+</div>
+
+<div class="ring">
+  <svg width="280" height="280">
+    <circle cx="140" cy="140" r="130" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+    <circle id="progress" cx="140" cy="140" r="130" fill="none" stroke="#8fb8a8" stroke-width="6"
+      stroke-linecap="round" stroke-dasharray="816.8" stroke-dashoffset="816.8"/>
+  </svg>
+  <div class="timer-display" id="display">10:00</div>
+  <div class="status" id="status">준비됨</div>
+</div>
+
+<div class="controls">
+  <button class="btn" id="startBtn">시작</button>
+  <button class="btn secondary" id="resetBtn">초기화</button>
+</div>
+
+<div class="volume-wrap">
+  🔈 <input type="range" id="volume" min="0" max="100" value="50"> 🔊
+</div>
+
+<div class="section-label" style="margin-top:40px">나 의 기 록</div>
+<div class="stats">
+  <div class="stat-card"><div class="num" id="statTotal">0</div><div class="label">총 명상 (분)</div></div>
+  <div class="stat-card"><div class="num" id="statCount">0</div><div class="label">완료 횟수</div></div>
+  <div class="stat-card"><div class="num" id="statStreak">0</div><div class="label">연속 일수 🔥</div></div>
+</div>
+<div class="history" id="historyList"></div>
+
+<script>
+let ctx = null, masterGain = null, nodes = [], bowlTimer = null;
+let totalSec = 600, remainSec = 600, tickInterval = null, running = false;
+const CIRC = 816.8;
+
+const $ = id => document.getElementById(id);
+
+// --- 사운드 합성 ---
+function makeNoiseBuffer(c) {
+  const len = c.sampleRate * 4;
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) {
+    const white = Math.random() * 2 - 1;
+    last = 0.98 * last + 0.02 * white; // 갈색에 가까운 부드러운 노이즈
+    d[i] = last * 8;
+  }
+  return buf;
+}
+
+function startSound(type) {
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  ctx.resume();
+  masterGain = ctx.createGain();
+  masterGain.gain.value = 0;
+  masterGain.connect(ctx.destination);
+  masterGain.gain.linearRampToValueAtTime($('volume').value / 100, ctx.currentTime + 3);
+
+  if (type === 'rain' || type === 'ocean' || type === 'wind') {
+    const src = ctx.createBufferSource();
+    src.buffer = makeNoiseBuffer(ctx);
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    src.connect(filter); filter.connect(masterGain);
+    if (type === 'rain') {
+      filter.frequency.value = 3000;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 400;
+      filter.disconnect(); src.disconnect();
+      src.connect(hp); hp.connect(filter); filter.connect(masterGain);
+    } else if (type === 'ocean') {
+      filter.frequency.value = 500;
+      // 파도의 밀려오고 빠지는 느낌
+      const lfo = ctx.createOscillator(), lfoGain = ctx.createGain();
+      lfo.frequency.value = 0.08; lfoGain.gain.value = 350;
+      lfo.connect(lfoGain); lfoGain.connect(filter.frequency);
+      lfo.start(); nodes.push(lfo);
+    } else {
+      filter.frequency.value = 800;
+      const lfo = ctx.createOscillator(), lfoGain = ctx.createGain();
+      lfo.frequency.value = 0.25; lfoGain.gain.value = 400;
+      lfo.connect(lfoGain); lfoGain.connect(filter.frequency);
+      lfo.start(); nodes.push(lfo);
+    }
+    src.start(); nodes.push(src);
+  } else if (type === 'bowl') {
+    const strike = () => {
+      if (!running) return;
+      [220, 330, 440, 587].forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f * (1 + Math.random() * 0.004);
+        g.gain.setValueAtTime(0, ctx.currentTime);
+        g.gain.linearRampToValueAtTime(0.15 / (i + 1), ctx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 12);
+        o.connect(g); g.connect(masterGain);
+        o.start(); o.stop(ctx.currentTime + 12);
+      });
+      bowlTimer = setTimeout(strike, 15000 + Math.random() * 10000);
+    };
+    strike();
+  } else if (type === 'drone') {
+    [110, 110.5, 220, 165].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = i < 2 ? 'sine' : 'triangle';
+      o.frequency.value = f;
+      g.gain.value = i < 2 ? 0.18 : 0.05;
+      o.connect(g); g.connect(masterGain);
+      o.start(); nodes.push(o);
+    });
+  }
+}
+
+function stopSound() {
+  if (bowlTimer) { clearTimeout(bowlTimer); bowlTimer = null; }
+  if (masterGain && ctx) {
+    masterGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+    const old = nodes; nodes = [];
+    setTimeout(() => old.forEach(n => { try { n.stop(); } catch(e){} }), 1600);
+  }
+}
+
+function chime() {
+  // 종료 알림 종소리 3번
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  for (let k = 0; k < 3; k++) {
+    const t = ctx.currentTime + k * 2.5;
+    [523, 784, 1047].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.2 / (i + 1), t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + 2.3);
+    });
+  }
+}
+
+// --- 타이머 ---
+function fmt(s) {
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function render() {
+  $('display').textContent = fmt(remainSec);
+  $('progress').style.strokeDashoffset = CIRC * (remainSec / totalSec);
+}
+function start() {
+  running = true;
+  document.body.classList.add('playing');
+  $('startBtn').textContent = '일시정지';
+  $('status').textContent = '명상 중…';
+  startSound(document.querySelector('#soundChips .active').dataset.sound);
+  tickInterval = setInterval(() => {
+    remainSec--;
+    render();
+    if (remainSec <= 0) finish();
+  }, 1000);
+}
+function pause() {
+  running = false;
+  document.body.classList.remove('playing');
+  clearInterval(tickInterval);
+  stopSound();
+  $('startBtn').textContent = '계속';
+  $('status').textContent = '일시정지';
+}
+function finish() {
+  pause();
+  chime();
+  $('startBtn').textContent = '시작';
+  $('status').textContent = '명상 완료 🙏';
+  saveSession(totalSec / 60, document.querySelector('#soundChips .active').textContent.trim());
+  remainSec = totalSec;
+  setTimeout(render, 100);
+}
+
+// --- 명상 기록 ---
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('goyo-history')) || []; }
+  catch (e) { return []; }
+}
+function saveSession(min, sound) {
+  const h = loadHistory();
+  h.unshift({ at: new Date().toISOString(), min, sound });
+  localStorage.setItem('goyo-history', JSON.stringify(h.slice(0, 200)));
+  renderHistory();
+}
+function calcStreak(h) {
+  const days = new Set(h.map(r => r.at.slice(0, 10)));
+  let streak = 0;
+  const d = new Date();
+  // 오늘 안 했어도 어제까지 이어졌으면 연속으로 인정
+  if (!days.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
+  while (days.has(d.toISOString().slice(0, 10))) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+function renderHistory() {
+  const h = loadHistory();
+  $('statTotal').textContent = h.reduce((s, r) => s + r.min, 0);
+  $('statCount').textContent = h.length;
+  $('statStreak').textContent = calcStreak(h);
+  const list = $('historyList');
+  if (!h.length) {
+    list.innerHTML = '<div class="empty-history">아직 기록이 없어요. 첫 명상을 시작해 보세요 🌱</div>';
+    return;
+  }
+  list.innerHTML = h.slice(0, 7).map(r => {
+    const d = new Date(r.at);
+    const when = (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return '<div class="history-item"><span>' + r.sound + ' · ' + r.min + '분</span><span class="when">' + when + '</span></div>';
+  }).join('');
+}
+function reset() {
+  pause();
+  remainSec = totalSec;
+  $('startBtn').textContent = '시작';
+  $('status').textContent = '준비됨';
+  render();
+}
+
+$('startBtn').onclick = () => running ? pause() : start();
+$('resetBtn').onclick = reset;
+$('volume').oninput = e => {
+  if (masterGain) masterGain.gain.linearRampToValueAtTime(e.target.value / 100, ctx.currentTime + 0.1);
+};
+
+document.querySelectorAll('#timeChips .chip').forEach(c => c.onclick = () => {
+  document.querySelector('#timeChips .active').classList.remove('active');
+  c.classList.add('active');
+  totalSec = remainSec = c.dataset.min * 60;
+  if (running) pause();
+  $('startBtn').textContent = '시작';
+  $('status').textContent = '준비됨';
+  render();
+});
+document.querySelectorAll('#soundChips .chip').forEach(c => c.onclick = () => {
+  document.querySelector('#soundChips .active').classList.remove('active');
+  c.classList.add('active');
+  if (running) { stopSound(); startSound(c.dataset.sound); }
+});
+
+render();
+renderHistory();
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
