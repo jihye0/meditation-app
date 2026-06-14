@@ -205,6 +205,7 @@
   <button class="chip" data-sound="wind">🍃 바람</button>
   <button class="chip" data-sound="bowl">🔔 싱잉볼</button>
   <button class="chip" data-sound="drone">🕉️ 옴 드론</button>
+  <button class="chip" data-sound="piano">🎹 짐노페디</button>
 </div>
 
 <div class="ring">
@@ -308,6 +309,63 @@ function makeNoiseBuffer(c, kind) {
     d[i] = raw[i] * t + raw[len + i] * (1 - t);
   }
   return buf;
+}
+
+// --- 피아노 음 합성 ---
+const SEMI = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+function freqOf(name) {
+  const m = name.match(/^([A-G]#?)(\d)$/);
+  const midi = SEMI[m[1]] + (parseInt(m[2]) + 1) * 12;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+function pianoNote(f, t, dur, vel) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vel, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 2600;
+  g.connect(lp); lp.connect(masterGain);
+  [[1, 1], [2, 0.28], [3, 0.1]].forEach(([mult, amp]) => {
+    const o = ctx.createOscillator();
+    o.type = 'triangle'; o.frequency.value = f * mult;
+    const og = ctx.createGain(); og.gain.value = amp;
+    o.connect(og); og.connect(g);
+    o.start(t); o.stop(t + dur + 0.1);
+  });
+}
+function playChord(names, t, dur, vel) { names.forEach(n => pianoNote(freqOf(n), t, dur, vel)); }
+
+// 짐노페디 1번 (사티) — 잔잔하게 편곡한 8마디 루프
+function startGymnopedie() {
+  const beat = 1.15;            // 한 박 (느리게)
+  const M = beat * 3;           // 한 마디(3박)
+  // 반주: A=Gmaj7, B=Dmaj7 두 마디를 번갈아
+  const bassA = 'G2', chordA = ['B3', 'D4', 'F#4'];
+  const bassB = 'D2', chordB = ['A3', 'C#4', 'F#4'];
+  // 멜로디 [마디번호(0~), 박, 음, 길이(박)]
+  const melody = [
+    [2, 0, 'F#5', 3],
+    [3, 0, 'C#6', 2], [3, 2, 'B5', 1],
+    [4, 0, 'A5', 1], [4, 1, 'G5', 1], [4, 2, 'F#5', 1],
+    [5, 0, 'E5', 3],
+    [6, 0, 'F#5', 1], [6, 1, 'E5', 1], [6, 2, 'D5', 1],
+    [7, 0, 'C#5', 3]
+  ];
+  const loopLen = 8 * M;
+  const schedule = (t0) => {
+    if (!running) return;
+    for (let m = 0; m < 8; m++) {
+      const mt = t0 + m * M;
+      const isA = m % 2 === 0;
+      pianoNote(freqOf(isA ? bassA : bassB), mt, M * 1.05, 0.22);
+      playChord(isA ? chordA : chordB, mt + beat, beat * 1.9, 0.11);
+      playChord(isA ? chordA : chordB, mt + beat * 2, beat * 1.0, 0.09);
+    }
+    melody.forEach(([m, b, n, len]) => pianoNote(freqOf(n), t0 + m * M + b * beat, len * beat * 1.05, 0.2));
+    bowlTimer = setTimeout(() => schedule(ctx.currentTime + 0.05), loopLen * 1000);
+  };
+  schedule(ctx.currentTime + 0.3);
 }
 
 // 아이폰 무음 모드에서도 소리가 나도록, 무음 오디오 태그를 먼저 재생해
@@ -420,6 +478,8 @@ function startSound(type) {
       o.connect(g); g.connect(masterGain);
       o.start(); nodes.push(o);
     });
+  } else if (type === 'piano') {
+    startGymnopedie();
   }
 }
 
