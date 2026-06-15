@@ -1,5 +1,9 @@
-const CACHE = 'goyo-v6';
-const ASSETS = ['.', 'index.html', 'manifest.json', 'icon.svg'];
+const CACHE = 'goyo-v7';
+const ASSETS = [
+  '.', 'index.html', 'manifest.json', 'icon.svg',
+  'sounds/rain.mp3', 'sounds/ocean.mp3', 'sounds/wind.mp3',
+  'sounds/bowl.mp3', 'sounds/piano.mp3'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
