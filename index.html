@@ -246,7 +246,6 @@
 <div class="quote" id="quote"></div>
 
 <script>
-let ctx = null, masterGain = null, nodes = [], bowlTimer = null;
 let totalSec = 600, remainSec = 600, tickInterval = null, running = false;
 const CIRC = 867.1;
 
@@ -276,8 +275,8 @@ const quotes = [
 $('quote').textContent = quotes[new Date().getDate() % quotes.length];
 
 // --- 사운드: 무료 음원 파일 재생 ---
-// 자연 소리·피아노·싱잉볼은 진짜 무료 음원(sounds/ 폴더)을 끊김 없이 반복한다.
-// 옴 드론만 사인파로 합성한다(순수 저음이라 합성으로도 자연스럽다).
+// HTML <audio>로 재생해 화면이 꺼져도(잠금화면) 음악이 계속 나오게 한다.
+// 자연 소리·피아노·싱잉볼은 진짜 무료 음원, 옴 드론·종소리는 미리 합성해 둔 파일.
 //  · 빗소리/파도/바람 — Google Sound Library (CC BY 4.0)
 //  · 짐노페디 No.1 — Musopen 녹음 (퍼블릭 도메인)
 //  · 싱잉볼 — Wikimedia Commons (CC BY-SA)
@@ -286,95 +285,67 @@ const SOUND_FILES = {
   ocean: 'sounds/ocean.mp3',
   wind:  'sounds/wind.mp3',
   bowl:  'sounds/bowl.mp3',
+  drone: 'sounds/drone.mp3',
   piano: 'sounds/piano.mp3'
 };
-// 디코딩한 오디오 버퍼를 캐시해 두 번째 재생부터는 즉시 시작되게 한다.
-const bufferCache = {};
-async function loadBuffer(type) {
-  if (bufferCache[type]) return bufferCache[type];
-  const res = await fetch(SOUND_FILES[type]);
-  const arr = await res.arrayBuffer();
-  const buf = await ctx.decodeAudioData(arr);
-  bufferCache[type] = buf;
-  return buf;
+const SOUND_LABELS = {
+  rain: '빗소리', ocean: '파도', wind: '바람',
+  bowl: '싱잉볼', drone: '옴 드론', piano: '짐노페디'
+};
+let audioEl = null;          // 현재 재생 중인 사운드
+
+// 음량을 ms 동안 부드럽게 올리고/내린다 (페이드 인·아웃)
+function fadeVolume(el, to, ms) {
+  clearInterval(el._fade);
+  const from = el.volume, steps = 30, dt = Math.max(16, ms / steps);
+  let i = 0;
+  el._fade = setInterval(() => {
+    i++;
+    el.volume = Math.min(1, Math.max(0, from + (to - from) * (i / steps)));
+    if (i >= steps) clearInterval(el._fade);
+  }, dt);
 }
 
-// 아이폰 무음 모드에서도 소리가 나도록, 무음 오디오 태그를 먼저 재생해
-// 오디오 세션을 미디어 재생 모드로 전환한다
-let silentEl = null;
-function unlockIOSAudio() {
-  if (!silentEl) {
-    silentEl = document.createElement('audio');
-    silentEl.setAttribute('playsinline', '');
-    silentEl.loop = true;
-    // 아주 짧은 무음 wav (base64)
-    silentEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACAgICA';
-  }
-  silentEl.play().catch(() => {});
-}
-
-async function startSound(type) {
-  unlockIOSAudio();
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  ctx.resume();
-  masterGain = ctx.createGain();
-  masterGain.gain.value = 0;
-  masterGain.connect(ctx.destination);
-  masterGain.gain.linearRampToValueAtTime($('volume').value / 100, ctx.currentTime + 3);
-
-  if (type === 'drone') {
-    // 옴 드론만 사인파 합성 — 낮은 음 두 개 + 배음으로 '옴' 같은 울림
-    [110, 110.5, 220, 165].forEach((f, i) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = i < 2 ? 'sine' : 'triangle';
-      o.frequency.value = f;
-      g.gain.value = i < 2 ? 0.18 : 0.05;
-      o.connect(g); g.connect(masterGain);
-      o.start(); nodes.push(o);
-    });
-    return;
-  }
-
-  // 나머지는 무료 음원 파일을 디코딩해 끊김 없이(gapless) 반복 재생
-  const myGain = masterGain;       // 로딩 중 사운드가 바뀌어도 엉키지 않게 고정
+// 잠금화면에 재생/일시정지 버튼 표시 + 백그라운드 재생 유지
+function setupMediaSession(type) {
+  if (!('mediaSession' in navigator)) return;
   try {
-    const buf = await loadBuffer(type);
-    if (!running || masterGain !== myGain) return;  // 로딩 끝났는데 멈췄거나 바뀌었으면 중단
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    src.connect(masterGain);
-    src.start();
-    nodes.push(src);
-  } catch (e) {
-    $('status').textContent = '음원을 불러오지 못했어요 😢';
-  }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: SOUND_LABELS[type] || '명상', artist: '고요', album: '명상 타이머'
+    });
+    navigator.mediaSession.playbackState = 'playing';
+    navigator.mediaSession.setActionHandler('play',  () => { if (!running) start(); });
+    navigator.mediaSession.setActionHandler('pause', () => { if (running) pause(); });
+  } catch (e) {}
+}
+
+function startSound(type) {
+  stopSound();                       // 남아있는 소리 정리
+  const el = new Audio(SOUND_FILES[type]);
+  el.loop = true;
+  el.preload = 'auto';
+  el.setAttribute('playsinline', '');
+  el.volume = 0;
+  audioEl = el;
+  el.play()
+    .then(() => fadeVolume(el, $('volume').value / 100, 2500))   // 3초에 걸쳐 서서히 커짐
+    .catch(() => { $('status').textContent = '재생을 시작할 수 없어요 😢'; });
+  setupMediaSession(type);
 }
 
 function stopSound() {
-  if (silentEl) silentEl.pause();
-  if (bowlTimer) { clearTimeout(bowlTimer); bowlTimer = null; }
-  if (masterGain && ctx) {
-    masterGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
-    const old = nodes; nodes = [];
-    setTimeout(() => old.forEach(n => { try { n.stop(); } catch(e){} }), 1600);
-  }
+  if (!audioEl) return;
+  const el = audioEl;
+  audioEl = null;
+  fadeVolume(el, 0, 1200);                          // 서서히 작아진 뒤 정지
+  setTimeout(() => { el.pause(); el.src = ''; }, 1300);
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
 
+// 종료 종소리 — 미리 만든 종 파일을 2.5초 간격으로 3번
 function chime() {
-  // 종료 알림 종소리 3번
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
   for (let k = 0; k < 3; k++) {
-    const t = ctx.currentTime + k * 2.5;
-    [523, 784, 1047].forEach((f, i) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.2 / (i + 1), t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(t); o.stop(t + 2.3);
-    });
+    setTimeout(() => { const b = new Audio('sounds/bell.mp3'); b.play().catch(() => {}); }, k * 2500);
   }
 }
 
@@ -467,7 +438,7 @@ function renderHistory() {
 $('startBtn').onclick = () => running ? pause() : start();
 $('resetBtn').onclick = reset;
 $('volume').oninput = e => {
-  if (masterGain) masterGain.gain.linearRampToValueAtTime(e.target.value / 100, ctx.currentTime + 0.1);
+  if (audioEl) { clearInterval(audioEl._fade); audioEl.volume = e.target.value / 100; }
 };
 
 document.querySelectorAll('#timeChips .chip').forEach(c => c.onclick = () => {
